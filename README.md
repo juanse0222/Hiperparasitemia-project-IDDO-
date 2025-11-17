@@ -1,12 +1,6 @@
-# Hyperparasitaemia Malaria Project
+# Hyperparasitaemia Malaria Project <img src="images/IDDO-logo.png" width="200" align = "left" />
 
-<p align="center">
-  <img src="images/IDDO-logo.png" alt="IDDO logo" width="200" />
-  &nbsp;&nbsp;
-  <img src="images/TDR-logo.png" alt="TDR logo" width="200" />
-</p>
-
-<p align="center">
+<p align="left">
   <a href="https://github.com/juanse0222/Hiperparasitemia-project-IDDO-">
     <img alt="GitHub last commit" src="https://img.shields.io/github/last-commit/juanse0222/Hiperparasitemia-project-IDDO-" />
   </a>
