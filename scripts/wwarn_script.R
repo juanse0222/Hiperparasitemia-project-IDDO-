@@ -4,8 +4,20 @@ pacman::p_load(tidyverse, rio, lubridate, here, epikit, flextable, janitor, scal
 ### 1. Curated and cleaning database WWARNset
 data <- read_csv("data/WWARNset.csv", locale = locale(encoding = "Latin1"))
 data_chosen <- import(here("outcomes", "chosen_studies.xlsx"))
+data_sdtm <- import(here("STDM", ""))
 
+
+### Reviewing and evaluation of database for both  sources
 data_chosen %>% summarise(n = n_distinct(sid))
+
+data_chosen <- left_join(data_chosen, select(data, sid, site),
+                         by = "sid")
+
+data_chosen %>% 
+  filter(is.na(site)) %>% 
+  select(c(sid)) %>% 
+  as.vector()
+
 
 ### 2. Identify how many patients corresponding to studies chosen with registers in WWARNset. 
 
@@ -17,61 +29,7 @@ data_2 %>%
 
 colnames(data_2) ### 56 variables, 
 
-### 2.1. Age distribution - histogram
-ggplot(data_2 %>% filter(!is.na(ageyears)), aes(x = ageyears)) +
-  geom_histogram(bins = 20) + 
-  geom_density(aes(y = after_stat(count))) +
-  scale_x_continuous(n.breaks = 20)
-
-### 3. Apply selection criteria to obtain the final number of patients 
-
-#### 3.1. Evaluation main variables and identifying behaviour and distribution
-
-### 3.1.1. Table 2xN age categorized (< 5yr and 5yrs and older x last follow-up < 28d, 28d, >28d)
-data_2 <- data_2  %>% 
-  mutate(age_5 = if_else(ageyears < 5, "<5y", "5y >"),
-         day_28 = case_when(lastday < 28 ~ "<28",
-                            lastday == 28 ~ "28",
-                            lastday > 28 ~ ">28",
-                            TRUE ~ NA),
-         day_28 = factor(day_28, levels = c("<28", "28", ">28")),
-         pfmicl0 = as.numeric(pfmicl0))  ### Transformation sort of variables to evaluate forward
-
-data_2 %>% 
-  tabyl(age_5, day_28) ##### Finding 818 registers without age and  4,688 register that manage age <5 and last follow-up 28 days
-                      ##### WWARNset doesn't include gender (sex)
-
-### 3.1.2. Distribution of parasitema in day 0 
-
-median(data_2$pfmicl0, na.rm = T) ### median of load parasite visit 0  = 18,420
-
-ggplot(data_2, aes(x = pfmicl0)) +
-  geom_histogram() +
-  geom_vline(xintercept = median(data_2$pfmicl0, na.rm = T), linetype = "dashed", color = "black") +
-  labs(title = "Load of parasite visit 0 without inclusion criteria") +
-  scale_x_continuous(transform = "log10", n.breaks = 10) +
-  scale_y_continuous(n.breaks = 20) +
-  theme(
-    axis.text.x = element_text(angle = 90)
-  )
-
-### 3.1.3. Applying criteria under 5y and follow-up until 28 days
-
-m <- median(data_2$pfmicl0[data_2$age_5 == "<5y" & data_2$day_28 == "28"], na.rm = TRUE) ### Median with criteria employed was = 1,5326
-
-ggplot(data_2 %>% filter(age_5 == "<5y" & day_28 == "28"), aes(x = pfmicl0)) +
-  geom_histogram() +
-  geom_vline(xintercept = m, linetype = "dashed", color = "black") +
-  labs(title = "Load of parasite visit 0 children under 5y and follow-up day 28") +
-  scale_x_continuous(transform = "log10", n.breaks = 10) +
-  scale_y_continuous(n.breaks = 20) +
-  theme(
-    axis.text.x = element_text(angle = 90)
-  )
-
-
-### 3.1.4 Characteristics and distribution of treatment. 
-#### Transformation of variables including names and establish those who are ACT
+#### 2.1. Transformation of variables including names and establish those who are ACT
 data_2 <- data_2 %>%
   mutate(
     treat_2 = case_when(
@@ -80,7 +38,7 @@ data_2 <- data_2 %>%
       treat == "AL_child" ~ "Artemether–Lumefantrine (child dose)",
       treat == "AL_PQ" ~ "Artemether–Lumefantrine + Primaquine",
       treat == "AL_unsupervised" ~ "Artemether–Lumefantrine (unsupervised)",
-  
+      
       treat == "AS" ~ "Artesunate",
       treat == "AS+AQ" ~ "Artesunate + Amodiaquine",
       treat == "AS+AQ-FDC" ~ "Artesunate–Amodiaquine (fixed-dose combination)",
@@ -121,14 +79,82 @@ data_2 <- data_2 %>%
       TRUE ~ "Unknown"
     ))
 
+data_2 <- data_2  %>% 
+  mutate(age_5 = if_else(ageyears < 5, "<5y", "5y >"),
+         day_28 = case_when(lastday < 28 ~ "<28",
+                            lastday == 28 ~ "28",
+                            lastday > 28 ~ ">28",
+                            TRUE ~ NA),
+         day_28 = factor(day_28, levels = c("<28", "28", ">28")),
+         pfmicl0 = as.numeric(pfmicl0))  ### Transformation sort of variables to evaluate forward
 
-### Bar-chart to evaluate treatment distribution applying inclusion criteria
+data_2 %>% 
+  tabyl(age_5, day_28) ##### Finding 818 registers without age and  4,688 register that manage age <5 and last follow-up 28 days
+##### WWARNset doesn't include gender (sex)
+
+data_2 %>% 
+  tabyl(outcome, age_5)
+
+### 3. Apply selection criteria to obtain the final number of patients 
+### Variables used to define inclusion criteria among patients from WWARNset
+#### 1. ageyears = < 5
+#### 2. lastday = 28 days - Day of outcome: Take the lowest number of any of the flags
+#### 3. Treat = ACT (Creating new variable act_category based on treatments)
+#### 4. FlgEF4 = Late clinical failure (parasitological sample checked for PF, with PCR -confirmation of recrudescence)
+#### 5. FlgPCR1 = Recrudescence, contain 1 PCR show a recrudescence. Important FlgPCR2 = Reinfection, FlgPCR3 = Indeterminate PCR, FlgPCR4 = Unknown PCR
+#### 6. PardensLast = highest parasite density on the day of outcome. 
+#### 7. Pardens = Parasitemia first smear on the day of inclusion
+#### 8. Recuparday = Day on which parasitemia recurred
+#### 9. Outcome = Main characteristics at the end of the follow-up - definition of case 
+
+
+#### 3.1. Evaluation main variables and identifying behaviour and distribution
+
+### 3.1.1. Table 2xN age categorized (< 5yr and 5yrs and older x last follow-up < 28d, 28d, >28d)
+
+### 3.1.1.1. Age distribution - histogram
+ggplot(data_2 %>% filter(!is.na(ageyears)), aes(x = ageyears)) +
+  geom_histogram(bins = 20) + 
+  geom_density(aes(y = after_stat(count))) +
+  scale_x_continuous(n.breaks = 20)
+
+
+### 3.1.2. Distribution of parasitema in day 0 
+
+median(data_2$pfmicl0, na.rm = T) ### median of load parasite visit 0  = 18,420
+
+ggplot(data_2, aes(x = pfmicl0)) +
+  geom_histogram() +
+  geom_vline(xintercept = median(data_2$pfmicl0, na.rm = T), linetype = "dashed", color = "black") +
+  labs(title = "Load of parasite visit 0 without inclusion criteria") +
+  scale_x_continuous(transform = "log10", n.breaks = 10) +
+  scale_y_continuous(n.breaks = 20) +
+  theme(
+    axis.text.x = element_text(angle = 90)
+  )
+
+### 3.1.3. Applying criteria under 5y and follow-up until 28 days
+
+m <- median(data_2$pfmicl0[data_2$age_5 == "<5y" & data_2$day_28 == "28"], na.rm = TRUE) ### Median with criteria employed was = 1,5326
+
+ggplot(data_2 %>% filter(age_5 == "<5y" & day_28 == "28"), aes(x = pfmicl0)) +
+  geom_histogram() +
+  geom_vline(xintercept = m, linetype = "dashed", color = "black") +
+  labs(title = "Load of parasite visit 0 children under 5y and follow-up day 28") +
+  scale_x_continuous(transform = "log10", n.breaks = 10) +
+  scale_y_continuous(n.breaks = 20) +
+  theme(
+    axis.text.x = element_text(angle = 90)
+  )
+
+### 3.1.4 Characteristics and distribution of treatment. 
+
+### Bar-chart to evaluate treatment distribution applying inclusion criteria without hyperparasitemia on visit 0
 ggplot(data_2 %>% filter(age_5 == "<5y" & day_28 == "28" & act_category == "ACT"), aes(x = treat)) +
   geom_bar() +
   geom_text(stat = "count", aes(label = after_stat(count)), vjust = -0.5, size = 3) +
   theme(
-    axis.text.x = element_text(angle = 90)
-  )
+    axis.text.x = element_text(angle = 90))
 
 
 ### 4 Arrange studies by descendant order
@@ -148,3 +174,26 @@ sid_arr_desc_2 %>% print(n = 1000)
 ggplot(data_3, aes(x = outcome)) +
   geom_bar() +
   geom_text(stat = "count", aes(label = after_stat(count)), vjust = -0.5)
+
+#### 6. Evaluating presence of patients following inclusion criteria 
+data_3 <- data_2 %>% 
+  filter(age_5 == "<5y" & day_28 == 28 & act_category == "ACT" & pfmicl0 > 250000)  ## Result = 0
+### Wasn't identified in the database children under 5 years old with hyperparasitemia on visit 0. 
+
+data_3 <- data_2 %>% 
+  filter(age_5 == "<5y" & day_28 == 28 & act_category == "ACT") 
+
+###########################################################################################################################################
+### Identifying lack studies (not matched) in WWARNset according with the list 
+
+data_lack <- left_join(data_chosen, select(data, sid, dateConverted), by = "sid")
+data_lack <- data_lack %>% filter(is.na(dateConverted))
+export(data_lack, "data_lack.xlsx")
+
+
+
+table(data_2$pfmicl0 > 100000)
+
+
+ggplot(data = data_2, aes(x = outcome, y = lastday)) +
+  geom_boxplot()
