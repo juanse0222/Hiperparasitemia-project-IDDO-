@@ -102,11 +102,7 @@ data_cons_mapper_6 %>%
   summarise(n = n(), .groups = "drop") %>% 
   summarise(n = n_distinct(pid)) ### patients under five years old
 
-
-ggplot(data_cons_mapper_6 %>% filter(dayofobs == 0), aes(x = as.numeric(pfmicl))) +
-  geom_histogram() +
-  scale_x_continuous(transform = "log10", n.breaks = 7)
-########################################################### SDTM #######################################################################
+########################################################### SDTM #####################################################################################################
 
 data_sdtm_DM <- import(here("SDTM", "DM 2025-01-10.csv")) %>% select(-c(DOMAIN)) ### DEMOGRAPHIC
 data_sdtm_DS <- import(here("SDTM", "DS 2025-01-10.csv")) %>% rename("SEQ" = "DSSEQ") %>% select(-c(DOMAIN)) ### DISPOSITION
