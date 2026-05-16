@@ -1,0 +1,11 @@
+# R session files
+.Rproj.user/
+.Rhistory
+.RData
+
+# macOS
+.DS_Store
+
+# IDDO restricted data — DO NOT COMMIT (public repository)
+data/
+Dictionary/

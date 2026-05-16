@@ -1,0 +1,25 @@
+# R session files
+.Rproj.user/
+.Rhistory
+.RData
+.Ruserdata
+
+# macOS
+.DS_Store
+
+# IDDO restricted data — DO NOT COMMIT (public repository)
+Bibliography/
+Dictionary/
+Dictionary 2/
+MAPPER/
+SDTM/
+WWARNset/
+data/
+*.csv
+*.rds
+
+# Backup
+hyperparasitaemia_malaria_project_backup/
+
+# Sensitive documents
+CDA_*.docx
